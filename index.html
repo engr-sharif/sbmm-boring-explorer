@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SBMM Boring Explorer</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: #f4f5f7; color: #1a2332; }
+
+  #app { display: flex; height: 100vh; }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: 370px; min-width: 370px; background: #fff;
+    display: flex; flex-direction: column; border-right: 2px solid #d0d5dd;
+    z-index: 1000;
+  }
+  #sidebar-header {
+    padding: 18px 20px; border-bottom: 2px solid #1a3a5c;
+    background: #1a3a5c; color: #fff;
+  }
+  #sidebar-header h1 {
+    font-size: 15px; font-weight: 700; letter-spacing: 0.5px;
+    text-transform: uppercase; margin-bottom: 2px;
+  }
+  #sidebar-header p { font-size: 11px; color: #8eabc4; font-weight: 400; }
+
+  /* Campaign toggle tabs */
+  #campaign-tabs {
+    display: flex; background: #1a3a5c; padding: 0 20px 12px;
+    gap: 6px;
+  }
+  .campaign-tab {
+    flex: 1; padding: 8px 10px; border-radius: 4px; border: none;
+    font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .campaign-tab.inactive {
+    background: rgba(255,255,255,0.08); color: #8eabc4; border: 1px solid rgba(255,255,255,0.12);
+  }
+  .campaign-tab.inactive:hover { background: rgba(255,255,255,0.15); color: #c0d5e8; }
+  .campaign-tab.active-prev {
+    background: #e74c3c; color: #fff; border: 1px solid #c0392b;
+  }
+  .campaign-tab.active-2025 {
+    background: #27ae60; color: #fff; border: 1px solid #1e8449;
+  }
+  .campaign-tab.active-all {
+    background: #f39c12; color: #fff; border: 1px solid #d68910;
+  }
+  .campaign-count {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    opacity: 0.8; margin-left: 4px;
+  }
+
+  /* Stats */
+  #stats-bar {
+    display: flex; gap: 1px; background: #d0d5dd;
+    border-bottom: 1px solid #d0d5dd;
+  }
+  .stat-chip {
+    flex: 1; text-align: center; padding: 10px 4px; background: #f8f9fb;
+  }
+  .stat-chip .num { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; color: #1a3a5c; }
+  .stat-chip .label { font-size: 9px; color: #667085; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+
+  /* Filters */
+  #filters {
+    padding: 14px 18px; border-bottom: 1px solid #e4e7ec;
+    overflow-y: auto; background: #fff;
+  }
+  .filter-group { margin-bottom: 12px; }
+  .filter-group label {
+    display: block; font-size: 10px; font-weight: 700; color: #667085;
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px;
+  }
+  .filter-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip {
+    padding: 4px 10px; border-radius: 3px; font-size: 11px; cursor: pointer;
+    border: 1px solid #d0d5dd; background: #f8f9fb; color: #475467;
+    transition: all 0.12s; user-select: none; font-weight: 500;
+  }
+  .chip:hover { border-color: #1a3a5c; color: #1a3a5c; background: #e8edf3; }
+  .chip.active { background: #1a3a5c; border-color: #1a3a5c; color: #fff; }
+  .chip .count { font-family: 'JetBrains Mono', monospace; font-size: 9px; opacity: 0.5; margin-left: 3px; }
+
+  /* Search */
+  #search-box {
+    width: 100%; padding: 7px 10px; border-radius: 3px;
+    border: 1px solid #d0d5dd; background: #f8f9fb; color: #1a2332;
+    font-size: 12px; font-family: 'Inter', sans-serif; outline: none;
+  }
+  #search-box:focus { border-color: #1a3a5c; box-shadow: 0 0 0 2px rgba(26,58,92,0.15); }
+  #search-box::placeholder { color: #98a2b3; }
+
+  /* Toggle row */
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 18px; border-bottom: 1px solid #e4e7ec; background: #f8f9fb;
+  }
+  .toggle-row span { font-size: 11px; font-weight: 600; color: #475467; text-transform: uppercase; letter-spacing: 0.5px; }
+  .toggle-switch {
+    position: relative; width: 38px; height: 20px; cursor: pointer;
+  }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: #d0d5dd; border-radius: 10px; transition: 0.2s;
+  }
+  .toggle-slider:before {
+    content: ''; position: absolute; height: 16px; width: 16px;
+    left: 2px; bottom: 2px; background: #fff; border-radius: 50%;
+    transition: 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .toggle-switch input:checked + .toggle-slider { background: #1a3a5c; }
+  .toggle-switch input:checked + .toggle-slider:before { transform: translateX(18px); }
+
+  /* Boring list */
+  #boring-list { flex: 1; overflow-y: auto; padding: 6px; background: #f4f5f7; }
+  #boring-list::-webkit-scrollbar { width: 5px; }
+  #boring-list::-webkit-scrollbar-thumb { background: #c0c5cc; border-radius: 3px; }
+
+  .boring-card {
+    padding: 9px 12px; margin-bottom: 4px; border-radius: 3px;
+    background: #fff; border: 1px solid #e4e7ec; cursor: pointer;
+    transition: all 0.1s; border-left: 3px solid transparent;
+  }
+  .boring-card:hover { border-left-color: #1a3a5c; background: #f0f4f8; }
+  .boring-card.selected { border-left-color: #1a3a5c; background: #e4edf5; }
+  .boring-card.campaign-2025 { border-right: 3px solid #27ae60; }
+  .boring-card .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+  .boring-card .card-id { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 13px; color: #1a2332; }
+  .boring-card .card-type {
+    font-size: 9px; padding: 2px 6px; border-radius: 2px;
+    font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .type-mw { background: #d1fadf; color: #12b76a; border: 1px solid #a6f4c5; }
+  .type-pz { background: #e8daef; color: #7d3c98; border: 1px solid #d2b4de; }
+  .type-sb { background: #fef3c7; color: #d97706; border: 1px solid #fde68a; }
+  .type-tp { background: #dbeafe; color: #2563eb; border: 1px solid #bfdbfe; }
+  .type-dp { background: #dbeafe; color: #2563eb; border: 1px solid #bfdbfe; }
+  .type-rw { background: #fce7f3; color: #db2777; border: 1px solid #fbcfe8; }
+  .boring-card .card-details { font-size: 10px; color: #667085; }
+  .boring-card .card-details span { margin-right: 10px; }
+
+  /* ── Map ── */
+  #map-container { flex: 1; position: relative; }
+  #map { width: 100%; height: 100%; }
+
+  /* Detail panel */
+  #detail-panel {
+    position: absolute; top: 12px; right: 12px; width: 330px;
+    background: rgba(255,255,255,0.97); border: 1px solid #d0d5dd;
+    border-radius: 4px; padding: 18px; z-index: 999;
+    display: none; backdrop-filter: blur(6px);
+    max-height: calc(100vh - 24px); overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  }
+  #detail-panel.show { display: block; }
+  #detail-close {
+    position: absolute; top: 10px; right: 12px; background: none;
+    border: none; color: #98a2b3; cursor: pointer; font-size: 18px; line-height: 1;
+  }
+  #detail-close:hover { color: #1a2332; }
+  #detail-panel h2 {
+    font-family: 'JetBrains Mono', monospace; font-size: 18px;
+    color: #1a2332; margin-bottom: 2px; font-weight: 700;
+  }
+  #detail-panel .detail-subproject {
+    font-size: 11px; color: #1a3a5c; margin-bottom: 14px;
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .detail-campaign-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 3px;
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 10px;
+  }
+  .badge-previous { background: #fef3f2; color: #c0392b; border: 1px solid #fecaca; }
+  .badge-2025 { background: #d1fadf; color: #1e8449; border: 1px solid #a6f4c5; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .detail-item {
+    padding: 8px 10px; background: #f8f9fb; border-radius: 3px;
+    border: 1px solid #e4e7ec;
+  }
+  .detail-item .dl { font-size: 9px; color: #667085; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+  .detail-item .dv { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1a2332; font-weight: 500; margin-top: 1px; }
+  .detail-item.full { grid-column: 1 / -1; }
+
+  /* Map controls restyle */
+  .leaflet-control-zoom { border: 1px solid #d0d5dd !important; border-radius: 3px !important; overflow: hidden; }
+  .leaflet-control-zoom a {
+    background: #fff !important; color: #475467 !important;
+    border-bottom-color: #e4e7ec !important; width: 30px !important; height: 30px !important;
+    line-height: 30px !important; font-size: 16px !important;
+  }
+  .leaflet-control-zoom a:hover { background: #f0f4f8 !important; color: #1a3a5c !important; }
+
+  /* Buttons */
+  #reset-btn {
+    padding: 4px 10px; border-radius: 3px; border: 1px solid #d0d5dd;
+    background: #fff; color: #667085; cursor: pointer; font-size: 10px;
+    font-weight: 600; transition: all 0.12s; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  #reset-btn:hover { border-color: #d92d20; color: #d92d20; background: #fef3f2; }
+
+  /* Legend */
+  #legend {
+    position: absolute; bottom: 16px; left: 12px; z-index: 999;
+    background: rgba(255,255,255,0.95); border: 1px solid #d0d5dd;
+    border-radius: 4px; padding: 10px 14px; backdrop-filter: blur(6px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  #legend h4 { font-size: 9px; color: #667085; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 1px; font-weight: 700; }
+  .legend-item { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; font-size: 11px; color: #475467; font-weight: 500; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid rgba(0,0,0,0.15); }
+  .legend-diamond { width: 10px; height: 10px; transform: rotate(45deg); border: 2px solid rgba(0,0,0,0.15); }
+  .legend-square { width: 10px; height: 10px; border: 2px solid rgba(0,0,0,0.15); border-radius: 1px; }
+  .legend-triangle { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 10px solid #888; }
+  .legend-sep { height: 1px; background: #e4e7ec; margin: 6px 0; }
+
+  /* Label callouts */
+  .well-label {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 10px !important; font-weight: 600 !important;
+    color: #1a2332 !important; background: rgba(255,255,255,0.92) !important;
+    border: 1px solid #98a2b3 !important; border-radius: 2px !important;
+    padding: 1px 5px !important; white-space: nowrap !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15) !important;
+    pointer-events: none !important;
+  }
+  .well-label::before {
+    border-right-color: #98a2b3 !important;
+  }
+  .boundary-label {
+    font-family: 'Inter', sans-serif !important;
+    font-size: 11px !important; font-weight: 600 !important;
+    color: #fff !important; background: rgba(30,30,30,0.85) !important;
+    border: none !important; border-radius: 3px !important;
+    padding: 3px 8px !important; white-space: nowrap !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5) !important;
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    #sidebar { width: 100%; min-width: 100%; max-height: 45vh; }
+    #app { flex-direction: column; }
+    #detail-panel { width: calc(100% - 24px); }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <h1>SBMM Boring Explorer</h1>
+      <p>Sulphur Bank Mercury Mine Superfund Site &mdash; Lake County, California</p>
+    </div>
+
+    <div id="campaign-tabs">
+      <button class="campaign-tab active-all" id="tab-all" onclick="setCampaign('all')">All<span class="campaign-count" id="count-all"></span></button>
+      <button class="campaign-tab inactive" id="tab-previous" onclick="setCampaign('previous')">Previous<span class="campaign-count" id="count-prev"></span></button>
+      <button class="campaign-tab inactive" id="tab-2025" onclick="setCampaign('2025')">2025 Jacobs<span class="campaign-count" id="count-2025"></span></button>
+    </div>
+
+    <div id="stats-bar">
+      <div class="stat-chip"><div class="num" id="stat-total">0</div><div class="label">Total</div></div>
+      <div class="stat-chip"><div class="num" id="stat-mw">0</div><div class="label">Mon. Wells</div></div>
+      <div class="stat-chip"><div class="num" id="stat-visible">0</div><div class="label">Showing</div></div>
+    </div>
+
+    <div class="toggle-row">
+      <span>Well ID Labels</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="label-toggle" onchange="toggleLabels(this.checked)">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <span>Show Soil Borings</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="toggle-sb" checked onchange="toggleTypeVisibility()">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <span>Show Test Pits</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="toggle-tp" checked onchange="toggleTypeVisibility()">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <span>Show Mon. Wells / Piezometers</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="toggle-mw" checked onchange="toggleTypeVisibility()">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <span>Show Figure 3-1 Overlay</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="toggle-rephasing" onchange="toggleRephasing(this.checked)">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+
+    <div id="filters">
+      <div class="filter-group">
+        <label>Search</label>
+        <input type="text" id="search-box" placeholder="Search by boring ID..." />
+      </div>
+      <div class="filter-group">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+          <label style="margin:0;">Subproject Area</label>
+          <button id="reset-btn" onclick="resetFilters()">Reset All</button>
+        </div>
+        <div class="filter-chips" id="filter-subproject"></div>
+      </div>
+      <div class="filter-group">
+        <label>Investigation Year</label>
+        <div class="filter-chips" id="filter-year"></div>
+      </div>
+      <div class="filter-group">
+        <label>Drilling Company</label>
+        <div class="filter-chips" id="filter-company"></div>
+      </div>
+      <div class="filter-group">
+        <label>Exploration Type</label>
+        <div class="filter-chips" id="filter-type"></div>
+      </div>
+    </div>
+
+    <div id="boring-list"></div>
+  </div>
+
+  <div id="map-container">
+    <div id="map"></div>
+
+    <div id="legend">
+      <h4>Subproject Areas</h4>
+      <div class="legend-item"><div class="legend-dot" style="background:#c0392b;"></div>South Cell</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#2471a3;"></div>North Cell</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#d4860b;"></div>Northwest Cell</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#7d3c98;"></div>Disturbed Rock &amp; Northern WRD</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#1e8449;"></div>Herman Impoundment</div>
+      <div class="legend-sep"></div>
+      <h4>Marker Shape</h4>
+      <div class="legend-item"><div class="legend-dot" style="background:#888;"></div>Monitoring Well / Piezometer</div>
+      <div class="legend-item"><div class="legend-square" style="background:#888;"></div>Soil Boring</div>
+      <div class="legend-item"><div class="legend-triangle"></div>Test Pit</div>
+      <div class="legend-sep"></div>
+      <h4>Campaign Border</h4>
+      <div class="legend-item"><div class="legend-dot" style="background:#888;border-color:rgba(255,255,255,0.7);"></div>Previous (1988&ndash;2024)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#888;border:2px solid #FFD700;"></div>2025 Jacobs</div>
+    </div>
+
+    <div id="detail-panel">
+      <button id="detail-close" onclick="closeDetail()">&times;</button>
+      <div id="detail-content"></div>
+    </div>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script>
+// Merge datasets, tagging each record with campaign
+const ALL_DATA = [
+  ...BORINGS_DATA.map(b => ({ ...b, campaign: 'previous' })),
+  ...BORINGS_2025.map(b => ({ ...b, campaign: '2025' }))
+];
+
+const SUBPROJECT_COLORS = {
+  'South Cell Subproject': '#c0392b',
+  'North Cell Subproject': '#2471a3',
+  'Northwest Cell Subproject': '#d4860b',
+  'Disturbed Rock and Northern Waste Rock Dam Subproject': '#7d3c98',
+  'Herman Impoundment': '#1e8449',
+  'Unknown': '#7f8c8d'
+};
+
+const SUBPROJECT_SHORT = {
+  'South Cell Subproject': 'South Cell',
+  'North Cell Subproject': 'North Cell',
+  'Northwest Cell Subproject': 'Northwest Cell',
+  'Disturbed Rock and Northern Waste Rock Dam Subproject': 'Disturbed Rock & Northern WRD',
+  'Herman Impoundment': 'Herman Impoundment',
+  'Unknown': 'Unknown'
+};
+
+const TYPE_CLASS = {
+  'Monitoring Well': 'type-mw', 'Piezometer': 'type-pz', 'Soil Boring': 'type-sb',
+  'Test Pit': 'type-tp', 'Direct Push': 'type-dp', 'Recovery Well Boring': 'type-rw', 'Other': 'type-dp'
+};
+
+let activeCampaign = 'all'; // 'all', 'previous', '2025'
+let activeFilters = { subproject: new Set(), year: new Set(), company: new Set(), type: new Set() };
+let searchQuery = '';
+let markers = {};
+let selectedId = null;
+let labelsVisible = false;
+
+// Map
+const map = L.map('map', { center: [39.003, -122.667], zoom: 15, zoomControl: true });
+
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Esri World Imagery', maxZoom: 19
+}).addTo(map);
+
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 19, opacity: 0.4
+}).addTo(map);
+
+// Figure 3-1 Subproject Locations overlay (full uncropped map from PDF)
+// Georeferenced via ORB feature-matching against Rephasing.kmz ground overlay
+// (83 inlier matches, 0.97° rotation correction applied, corner-averaged bounds)
+const figure31Bounds = [[38.9954940, -122.6818640], [39.0144674, -122.6544142]];
+const rephasingOverlay = L.imageOverlay('Figure3-1.jpg', figure31Bounds, { opacity: 0.7, interactive: false });
+
+function toggleRephasing(show) {
+  if (show) rephasingOverlay.addTo(map);
+  else map.removeLayer(rephasingOverlay);
+}
+
+// Marker icons — shape by type, gold border for 2025
+function createMarkerIcon(color, type, is2025, selected) {
+  const size = selected ? 15 : 10;
+  const bw = selected ? 3 : 2;
+  const border = selected ? '#fff' : (is2025 ? '#FFD700' : 'rgba(255,255,255,0.7)');
+  const shadow = selected ? `0 0 0 3px ${color}40, 0 0 10px ${color}60` : `0 0 4px ${color}50`;
+
+  if (type === 'Test Pit') {
+    // Triangle (CSS border trick)
+    const s = selected ? 8 : 6;
+    const h = selected ? 14 : 10;
+    const bc = is2025 ? `; filter: drop-shadow(0 0 2px #FFD700)` : '';
+    return L.divIcon({
+      className: 'custom-marker',
+      html: `<div style="width:0;height:0;border-left:${s}px solid transparent;border-right:${s}px solid transparent;border-bottom:${h}px solid ${color}${bc};"></div>`,
+      iconSize: [s*2, h], iconAnchor: [s, h/2]
+    });
+  }
+  if (type === 'Soil Boring') {
+    // Square
+    return L.divIcon({
+      className: 'custom-marker',
+      html: `<div style="width:${size}px;height:${size}px;background:${color};border-radius:1px;border:${bw}px solid ${border};box-shadow:${shadow};"></div>`,
+      iconSize: [size, size], iconAnchor: [size/2, size/2]
+    });
+  }
+  // Circle for Monitoring Well, Piezometer, and others
+  return L.divIcon({
+    className: 'custom-marker',
+    html: `<div style="width:${size}px;height:${size}px;background:${color};border-radius:50%;border:${bw}px solid ${border};box-shadow:${shadow};"></div>`,
+    iconSize: [size, size], iconAnchor: [size/2, size/2]
+  });
+}
+
+// Type visibility toggles
+let showSB = true, showTP = true, showMW = true;
+function toggleTypeVisibility() {
+  showSB = document.getElementById('toggle-sb').checked;
+  showTP = document.getElementById('toggle-tp').checked;
+  showMW = document.getElementById('toggle-mw').checked;
+  applyFilters();
+}
+
+// Create all markers
+ALL_DATA.forEach(b => {
+  if (!b.lat || !b.lng) return;
+  const color = SUBPROJECT_COLORS[b.subproject] || '#7f8c8d';
+  const marker = L.marker([b.lat, b.lng], { icon: createMarkerIcon(color, b.type, b.campaign === '2025', false) });
+  marker.boringData = b;
+  marker.on('click', () => selectBoring(b.id, b.campaign));
+
+  marker.bindTooltip(b.id, {
+    permanent: true, direction: 'right', offset: [8, -2],
+    className: 'well-label', opacity: 0
+  });
+
+  marker.addTo(map);
+  // Use campaign-prefixed key to avoid collisions between previous SB-7 and 2025 SB-7
+  const key = b.campaign + ':' + b.id;
+  markers[key] = marker;
+});
+
+// Campaign toggle
+function setCampaign(c) {
+  activeCampaign = c;
+  // Update tab styles
+  ['all','previous','2025'].forEach(t => {
+    const btn = document.getElementById('tab-' + (t === 'previous' ? 'previous' : t));
+    if (t === c) {
+      btn.className = 'campaign-tab active-' + (t === 'previous' ? 'prev' : t);
+    } else {
+      btn.className = 'campaign-tab inactive';
+    }
+  });
+  rebuildFilters();
+  applyFilters();
+}
+
+function getActiveData() {
+  if (activeCampaign === 'all') return ALL_DATA;
+  return ALL_DATA.filter(b => b.campaign === activeCampaign);
+}
+
+// Labels
+function toggleLabels(show) {
+  labelsVisible = show;
+  document.getElementById('label-toggle').checked = show;
+  Object.values(markers).forEach(m => {
+    if (!map.hasLayer(m)) return;
+    const tt = m.getTooltip();
+    if (tt) tt.setOpacity(show ? 1 : 0);
+  });
+}
+
+// Filters
+function rebuildFilters() {
+  const data = getActiveData();
+  const groups = { subproject: {}, year: {}, company: {}, type: {} };
+  data.forEach(b => {
+    const sp = SUBPROJECT_SHORT[b.subproject] || b.subproject || 'Unknown';
+    groups.subproject[sp] = (groups.subproject[sp] || 0) + 1;
+    if (b.year) groups.year[b.year] = (groups.year[b.year] || 0) + 1;
+    if (b.company) groups.company[b.company] = (groups.company[b.company] || 0) + 1;
+    if (b.type) groups.type[b.type] = (groups.type[b.type] || 0) + 1;
+  });
+
+  const shortToFull = {};
+  Object.entries(SUBPROJECT_SHORT).forEach(([full, short]) => { shortToFull[short] = full; });
+
+  // Clear and rebuild each filter group
+  Object.entries(groups).forEach(([filterKey, values]) => {
+    const container = document.getElementById(`filter-${filterKey}`);
+    container.innerHTML = '';
+    Object.entries(values).sort((a, b) => b[1] - a[1]).forEach(([val, count]) => {
+      const chip = document.createElement('div');
+      chip.className = 'chip' + (activeFilters[filterKey].has(filterKey === 'subproject' ? (shortToFull[val] || val) : val) ? ' active' : '');
+      chip.innerHTML = `${val}<span class="count">${count}</span>`;
+      chip.onclick = () => {
+        const actualVal = filterKey === 'subproject' ? (shortToFull[val] || val) : val;
+        if (activeFilters[filterKey].has(actualVal)) {
+          activeFilters[filterKey].delete(actualVal);
+          chip.classList.remove('active');
+        } else {
+          activeFilters[filterKey].add(actualVal);
+          chip.classList.add('active');
+        }
+        applyFilters();
+      };
+      container.appendChild(chip);
+    });
+  });
+
+  // Update stats
+  document.getElementById('stat-total').textContent = data.length;
+  document.getElementById('stat-mw').textContent = data.filter(b => b.is_mw).length;
+}
+
+function passesFilter(b) {
+  // Type visibility toggles
+  if (b.type === 'Test Pit' && !showTP) return false;
+  if (b.type === 'Soil Boring' && !showSB) return false;
+  if ((b.type === 'Monitoring Well' || b.type === 'Piezometer' || b.type === 'Direct Push' || b.type === 'Recovery Well Boring') && !showMW) return false;
+  // Campaign filter
+  if (activeCampaign !== 'all' && b.campaign !== activeCampaign) return false;
+  if (searchQuery && !b.id.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+  if (activeFilters.subproject.size && !activeFilters.subproject.has(b.subproject)) return false;
+  if (activeFilters.year.size && !activeFilters.year.has(b.year)) return false;
+  if (activeFilters.company.size && !activeFilters.company.has(b.company)) return false;
+  if (activeFilters.type.size && !activeFilters.type.has(b.type)) return false;
+  return true;
+}
+
+function applyFilters() {
+  let visible = 0;
+  const listEl = document.getElementById('boring-list');
+  listEl.innerHTML = '';
+
+  ALL_DATA.forEach(b => {
+    const key = b.campaign + ':' + b.id;
+    const show = passesFilter(b);
+    if (markers[key]) {
+      if (show) {
+        markers[key].addTo(map);
+        const tt = markers[key].getTooltip();
+        if (tt) tt.setOpacity(labelsVisible ? 1 : 0);
+        visible++;
+      } else {
+        map.removeLayer(markers[key]);
+      }
+    }
+    if (show) listEl.appendChild(createBoringCard(b));
+  });
+
+  document.getElementById('stat-visible').textContent = visible;
+}
+
+function resetFilters() {
+  activeFilters = { subproject: new Set(), year: new Set(), company: new Set(), type: new Set() };
+  searchQuery = '';
+  document.getElementById('search-box').value = '';
+  document.querySelectorAll('.chip.active').forEach(c => c.classList.remove('active'));
+  applyFilters();
+}
+
+function createBoringCard(b) {
+  const card = document.createElement('div');
+  const selKey = selectedId;
+  const thisKey = b.campaign + ':' + b.id;
+  card.className = `boring-card${selKey === thisKey ? ' selected' : ''}${b.campaign === '2025' ? ' campaign-2025' : ''}`;
+  card.dataset.key = thisKey;
+  card.onclick = () => selectBoring(b.id, b.campaign);
+  const typeShort = b.type === 'Monitoring Well' ? 'MW' : b.type === 'Piezometer' ? 'PZ' :
+    b.type === 'Test Pit' ? 'TP' : b.type === 'Direct Push' ? 'DP' :
+    b.type === 'Recovery Well Boring' ? 'RWB' : 'SB';
+  card.innerHTML = `
+    <div class="card-header">
+      <span class="card-id">${b.id}</span>
+      <span class="card-type ${TYPE_CLASS[b.type] || 'type-dp'}">${typeShort}</span>
+    </div>
+    <div class="card-details">
+      <span>${SUBPROJECT_SHORT[b.subproject] || b.subproject || ''}</span>
+      <span>${b.year || ''}</span>
+      ${b.elevation ? `<span>${b.elevation} ft</span>` : ''}
+      ${b.campaign === '2025' ? '<span style="color:#27ae60;font-weight:600;">2025</span>' : ''}
+    </div>`;
+  return card;
+}
+
+function selectBoring(id, campaign) {
+  // Deselect previous
+  if (selectedId && markers[selectedId]) {
+    const pd = markers[selectedId].boringData;
+    const col = SUBPROJECT_COLORS[pd.subproject] || '#7f8c8d';
+    markers[selectedId].setIcon(createMarkerIcon(col, pd.type, pd.campaign === '2025', false));
+  }
+  const key = campaign + ':' + id;
+  selectedId = key;
+  const b = ALL_DATA.find(x => x.id === id && x.campaign === campaign);
+  if (!b) return;
+  if (markers[key]) {
+    const col = SUBPROJECT_COLORS[b.subproject] || '#7f8c8d';
+    markers[key].setIcon(createMarkerIcon(col, b.type, b.campaign === '2025', true));
+    map.panTo([b.lat, b.lng], { animate: true });
+  }
+  showDetail(b);
+  document.querySelectorAll('.boring-card').forEach(c => {
+    c.classList.toggle('selected', c.dataset.key === key);
+  });
+}
+
+function fmt(val, suffix) {
+  if (val === null || val === undefined || val === '' || val === 'None' || val === 'Unknown') return '&mdash;';
+  return val + (suffix || '');
+}
+
+function showDetail(b) {
+  const isPrev = b.campaign === 'previous';
+  const badgeClass = isPrev ? 'badge-previous' : 'badge-2025';
+  const badgeText = isPrev ? 'Previous Exploration' : '2025 Jacobs Investigation';
+
+  document.getElementById('detail-content').innerHTML = `
+    <h2>${b.id}</h2>
+    <div class="detail-subproject">${SUBPROJECT_SHORT[b.subproject] || b.subproject || ''}</div>
+    <div class="detail-campaign-badge ${badgeClass}">${badgeText}</div>
+    <div class="detail-grid">
+      <div class="detail-item"><div class="dl">Type</div><div class="dv">${b.type}</div></div>
+      <div class="detail-item"><div class="dl">Monitoring Well</div><div class="dv">${b.well_type ? b.well_type + (b.mw_id ? ' (' + b.mw_id + ')' : '') : (b.is_mw ? 'Yes' : 'No')}</div></div>
+      <div class="detail-item"><div class="dl">Year</div><div class="dv">${fmt(b.year)}</div></div>
+      <div class="detail-item"><div class="dl">Company</div><div class="dv">${fmt(b.company)}</div></div>
+      ${isPrev ? `<div class="detail-item"><div class="dl">Investigating Firm</div><div class="dv">${fmt(b.firm)}</div></div>` : ''}
+      ${isPrev ? `<div class="detail-item"><div class="dl">Installation Date</div><div class="dv">${fmt(b.date)}</div></div>` : ''}
+      <div class="detail-item"><div class="dl">Latitude</div><div class="dv">${b.lat ? b.lat.toFixed(7) : '&mdash;'}</div></div>
+      <div class="detail-item"><div class="dl">Longitude</div><div class="dv">${b.lng ? b.lng.toFixed(7) : '&mdash;'}</div></div>
+      <div class="detail-item"><div class="dl">Ground Elevation</div><div class="dv">${b.elevation ? b.elevation + ' ft' + (b.elevation_estimated ? ' *' : '') : '&mdash;'}</div></div>
+      <div class="detail-item"><div class="dl">Depth of Exploration</div><div class="dv">${fmt(b.depth, ' ft')}</div></div>
+      <div class="detail-item"><div class="dl">Depth to Groundwater</div><div class="dv">${b.gw_depth ? b.gw_depth + ' ft' : (b.type === 'Test Pit' ? 'N/A' : (isPrev ? 'N.E.' : '&mdash;'))}</div></div>
+      <div class="detail-item"><div class="dl">Screen Interval</div><div class="dv">${fmt(b.screen, '')}</div></div>
+      ${isPrev ? `<div class="detail-item"><div class="dl">Casing Diameter</div><div class="dv">${fmt(b.casing, ' in')}</div></div>` : ''}
+      ${isPrev ? `<div class="detail-item"><div class="dl">Well Condition</div><div class="dv">${fmt(b.condition)}</div></div>` : ''}
+      ${b.notes && b.notes !== 'None' ? `<div class="detail-item full"><div class="dl">Notes</div><div class="dv" style="font-size:11px;font-family:'Inter',sans-serif;font-weight:400;">${b.notes}</div></div>` : ''}
+      ${b.elevation_estimated ? `<div style="font-size:10px;color:#888;font-style:italic;margin-top:6px;">* Elevation estimated from USGS National Elevation Dataset</div>` : ''}
+    </div>`;
+  document.getElementById('detail-panel').classList.add('show');
+}
+
+function closeDetail() {
+  document.getElementById('detail-panel').classList.remove('show');
+  if (selectedId && markers[selectedId]) {
+    const pd = markers[selectedId].boringData;
+    const col = SUBPROJECT_COLORS[pd.subproject] || '#7f8c8d';
+    markers[selectedId].setIcon(createMarkerIcon(col, pd.type, pd.campaign === '2025', false));
+  }
+  selectedId = null;
+  document.querySelectorAll('.boring-card.selected').forEach(c => c.classList.remove('selected'));
+}
+
+document.getElementById('search-box').addEventListener('input', e => { searchQuery = e.target.value; applyFilters(); });
+
+function init() {
+  document.getElementById('count-all').textContent = ALL_DATA.length;
+  document.getElementById('count-prev').textContent = BORINGS_DATA.length;
+  document.getElementById('count-2025').textContent = BORINGS_2025.length;
+  rebuildFilters();
+  applyFilters();
+}
+init();
+</script>
+</body>
+</html>
