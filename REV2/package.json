@@ -1,0 +1,11 @@
+{
+  "name": "sbmm-boring-explorer-rev2",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build:data": "node ./scripts/build-data.mjs",
+    "validate:data": "node ./scripts/validate-data.mjs",
+    "check": "npm run build:data && npm run validate:data"
+  }
+}
