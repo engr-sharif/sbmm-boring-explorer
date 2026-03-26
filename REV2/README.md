@@ -23,6 +23,23 @@ python3 -m http.server 8080
 # open http://localhost:8080
 ```
 
+## Publish so others can open in browser
+
+You have two options:
+
+1. **Local browser only (no publishing needed):**
+   - Run a local static server and open `http://localhost:8080`.
+2. **Hosted browser access (recommended):**
+   - Push to GitHub and enable **GitHub Pages** using the included workflow at
+     `.github/workflows/deploy-rev2-pages.yml`.
+   - In your GitHub repo settings, set **Pages → Build and deployment → Source = GitHub Actions**.
+   - After the workflow succeeds, your REV2 site will be available at your repo's Pages URL.
+
+### Notes for Pages
+
+- The workflow deploys the `REV2/` folder directly as the Pages artifact.
+- Any push to `main` that changes `REV2/**` will auto-deploy.
+
 ## Notes
 
 - REV2 consumes source records from the legacy repository as input only (read-only pipeline).
