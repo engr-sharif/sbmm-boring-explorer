@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://unpkg.com https://server.arcgisonline.com; style-src 'self' 'unsafe-inline' https://unpkg.com; script-src 'self' https://unpkg.com; img-src 'self' data: https://server.arcgisonline.com; connect-src 'self';" />
+    <title>SBMM Boring Explorer REV2</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <h1>SBMM Boring Explorer REV2</h1>
+        <p>Data-quality-first geospatial decision support</p>
+      </div>
+      <div class="header-actions">
+        <button id="save-view-btn">Save View</button>
+        <button id="load-view-btn">Load View</button>
+        <button id="export-csv-btn">Export CSV</button>
+        <button id="export-geojson-btn">Export GeoJSON</button>
+      </div>
+    </header>
+
+    <main id="layout">
+      <aside id="sidebar" aria-label="Filters and results">
+        <section class="panel">
+          <h2>Campaign</h2>
+          <div class="campaign-row" role="tablist" aria-label="Campaign filter">
+            <button class="campaign-btn active" data-campaign="all">All</button>
+            <button class="campaign-btn" data-campaign="previous">Previous</button>
+            <button class="campaign-btn" data-campaign="2025">2025</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Search and filters</h2>
+          <label for="search-input">Search ID</label>
+          <input id="search-input" type="search" placeholder="e.g., MW-3" />
+
+          <fieldset>
+            <legend>Record type visibility</legend>
+            <label><input type="checkbox" id="toggle-mw" checked /> Wells / piezometers</label>
+            <label><input type="checkbox" id="toggle-sb" checked /> Soil borings</label>
+            <label><input type="checkbox" id="toggle-tp" checked /> Test pits</label>
+          </fieldset>
+
+          <label><input type="checkbox" id="toggle-boundaries" checked /> Show boundaries</label>
+          <label><input type="checkbox" id="toggle-labels" /> Show labels</label>
+
+          <div class="facet-wrap">
+            <h3>Subproject</h3>
+            <div id="facet-subproject" class="facet-grid"></div>
+          </div>
+          <div class="facet-wrap">
+            <h3>Year</h3>
+            <div id="facet-year" class="facet-grid"></div>
+          </div>
+          <div class="facet-wrap">
+            <h3>Company</h3>
+            <div id="facet-company" class="facet-grid"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Results <span id="visible-count"></span></h2>
+          <ul id="result-list" aria-label="Filtered borings"></ul>
+        </section>
+      </aside>
+
+      <section id="map-wrap">
+        <div id="map" aria-label="Map"></div>
+        <aside id="compare-panel" aria-label="Comparison panel">
+          <h2>Compare (up to 3)</h2>
+          <div id="compare-content">Select borings using the “+ Compare” button.</div>
+        </aside>
+      </section>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>
